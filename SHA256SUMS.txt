@@ -1,0 +1,2 @@
+ceb4e304fd73cb84bacdeeb3c4f8a0427e6c265c9d53618ba19f65282231ee64  ZapretAndroid-v1.10.4-r3.apk
+55e7b43fe9da5af37330ddd3275d63115c3926f57d34d5387ae5eef7e265286c  ZapretAndroid-v1.10.4-r3.zip
