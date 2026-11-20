@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080d18">
+  <meta name="description" content="Мобильная панель настройки сетевого маршрута в тёмной теме Arisu.">
+  <title>Zapret Aris — сетевой маршрут</title>
+  <link rel="icon" href="assets/arisu-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#home" data-navigate="home" aria-label="Zapret Aris — обзор">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <path d="M24 5.5 41 15v18L24 42.5 7 33V15L24 5.5Z" stroke="currentColor" stroke-width="1.5"/>
+            <path d="m15.5 29.5 8.4-16 8.6 16M18.8 24h10.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="35.5" cy="13" r="2" fill="#B9FF9B"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>ZAPRET <span>ARIS</span></strong>
+          <small>NETWORK ASSISTANT <i>·</i> MOBILE</small>
+        </span>
+      </a>
+
+      <div class="topbar-tools">
+        <span class="preview-pill"><span class="preview-dot"></span> UI PREVIEW</span>
+        <button class="icon-button" type="button" data-navigate="route" aria-label="Открыть настройки маршрута" title="Настройки маршрута">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="m19.4 13.5 1.1.9-1.1 1.9-1.4-.5a7.7 7.7 0 0 1-1.5.9l-.2 1.5h-2.2l-.4-1.4a7.5 7.5 0 0 1-1.7 0l-.8 1.3-2-1 .4-1.5a7.1 7.1 0 0 1-1.2-1.2l-1.5.2-1-2 1.2-.9a7.4 7.4 0 0 1 0-1.7l-1.2-.8 1-2 1.5.3a7.3 7.3 0 0 1 1.2-1.2L9.2 4.8l2-1 .8 1.3a7.5 7.5 0 0 1 1.7 0l.8-1.3 2 1-.4 1.5a7.3 7.3 0 0 1 1.2 1.2l1.5-.3 1 2-1.2.8a7.4 7.4 0 0 1 0 1.7Z"/></svg>
+        </button>
+        <span class="avatar-chip" aria-label="Arisu"><span>A</span></span>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="view is-active" id="view-home" data-view="home" aria-labelledby="home-title">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-mark"></span> NETWORK LAB <span class="eyebrow-divider">/</span> 01</p>
+            <h1 id="home-title">Маршрут под <span>контролем.</span></h1>
+            <p class="page-lede">Выбери сетевой профиль и способ подключения. Arisu поможет собрать настройки в одном месте.</p>
+          </div>
+          <div class="date-chip" aria-label="Панель сетевого профиля">
+            <span class="date-chip-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16M7 4v7m10-7v7M6 12.5h12v7H6z"/><path d="m9 16 2 2 4-4"/></svg></span>
+            <span><small>SESSION</small><strong>READY TO TUNE</strong></span>
+          </div>
+        </div>
+
+        <div class="home-grid">
+          <article class="hero-card">
+            <img class="hero-art" src="assets/arisu-reference.png" alt="Арису из Blue Archive с портативной игровой консолью" fetchpriority="high">
+            <div class="hero-grid" aria-hidden="true"></div>
+            <div class="hero-glow" aria-hidden="true"></div>
+            <div class="hero-content">
+              <div class="hero-topline">
+                <div class="arisu-stamp"><span class="stamp-symbol">A</span><span><small>TACTICAL NETWORK ASSIST</small><strong>ARISU <i>01</i></strong></span></div>
+                <span class="state-tag"><i></i> READY</span>
+              </div>
+              <div class="hero-copy">
+                <p class="hero-kicker">LINK ASSIST <span>·</span> PROFILE SETUP</p>
+                <h2>Чистый сигнал.<br><span>Твой сценарий.</span></h2>
+                <p>Настрой профиль и точку входа — без лишних экранов и сложных меню.</p>
+                <button class="button button-primary" type="button" data-navigate="profiles">
+                  <span>Выбрать профиль</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h14m-5.5-5.5L18.5 12 13 17.5"/></svg>
+                </button>
+              </div>
+              <div class="hero-foot">
+                <div><span class="foot-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.6c0 4.3-2.9 7.3-7 8.9-4.1-1.6-7-4.6-7-8.9V6l7-2.5Z"/><path d="m9 12 2 2 4-4"/></svg></span><span><small>ВЫБРАННЫЙ ПРОФИЛЬ</small><strong data-profile-name>Авто · баланс</strong></span></div>
+                <span class="hero-foot-code">AR-LINK // 01</span>
+              </div>
+            </div>
+            <span class="hero-corner hero-corner-tl" aria-hidden="true"></span>
+            <span class="hero-corner hero-corner-br" aria-hidden="true"></span>
+          </article>
+
+          <aside class="side-stack" aria-label="Сводка маршрута">
+            <section class="panel route-overview">
+              <div class="panel-heading"><span class="panel-index">01 / ROUTE</span><button class="text-link" type="button" data-navigate="route">Настроить <span>↗</span></button></div>
+              <h2>Путь подключения</h2>
+              <div class="route-mode-line">
+                <span class="route-mode-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4m0 0L7 9m5-5 5 5M5 14a9 9 0 0 0 14 0"/></svg></span>
+                <span><small>ТРАНСПОРТ</small><strong data-transport-name>Android VPN · TUN</strong></span>
+                <span class="mode-arrow">→</span>
+              </div>
+              <div class="route-rule"></div>
+              <div class="route-mini-grid">
+                <div><small>DNS</small><strong data-dns-name>Системный</strong></div>
+                <div><small>ПРОФИЛЬ</small><strong data-profile-short>Авто</strong></div>
+              </div>
+              <div class="route-note"><span class="pulse-dot"></span><span>Параметры готовы к настройке</span></div>
+            </section>
+
+            <section class="panel quick-panel">
+              <div class="quick-panel-top">
+                <span class="quick-orbit" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5 14.4 9.6 20.5 12l-6.1 2.4L12 20.5l-2.4-6.1L3.5 12l6.1-2.4L12 3.5Z"/><circle cx="18.5" cy="5.5" r="1.5"/></svg></span>
+                <div><small>QUICK SETUP</small><strong>Нужен свой прокси?</strong></div>
+              </div>
+              <p>Выбери SOCKS5 или WebSocket-маршрут и сохрани адрес в настройках.</p>
+              <button class="button button-quiet" type="button" data-navigate="route">Открыть маршруты <span>↗</span></button>
+            </section>
+          </aside>
+        </div>
+
+        <section class="section-block" aria-labelledby="quick-profiles-title">
+          <div class="section-heading">
+            <div><p class="eyebrow">PROFILE SELECTOR <span class="eyebrow-divider">/</span> 02</p><h2 id="quick-profiles-title">С чего начнём?</h2></div>
+            <button class="text-link" type="button" data-navigate="profiles">Все профили <span>→</span></button>
+          </div>
+          <div class="profile-grid profile-grid-home">
+            <button class="profile-card profile-card-small is-selected" type="button" data-profile="auto" aria-pressed="true">
+              <span class="profile-card-top"><span class="profile-glyph glyph-spark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-2 8h7L9 22l2-9H5l8-11Z"/></svg></span><span class="profile-check">✓</span></span>
+              <span class="profile-title">Авто · баланс</span>
+              <span class="profile-desc">Рекомендуемый старт для повседневного использования.</span>
+              <span class="profile-tags"><i>SMART</i><i>DEFAULT</i></span>
+            </button>
+            <button class="profile-card profile-card-small" type="button" data-profile="general" aria-pressed="false">
+              <span class="profile-card-top"><span class="profile-glyph glyph-wave"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h3l3-7 5.5 14 3.5-7h3"/></svg></span><span class="profile-check">✓</span></span>
+              <span class="profile-title">Flowseal · General</span>
+              <span class="profile-desc">Общий профиль списков для сайтов и приложений.</span>
+              <span class="profile-tags"><i>FLOWSEAL</i><i>TCP</i></span>
+            </button>
+            <button class="profile-card profile-card-small" type="button" data-profile="quic" aria-pressed="false">
+              <span class="profile-card-top"><span class="profile-glyph glyph-udp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8m0-12.8L5.6 18.4"/><circle cx="12" cy="12" r="4.5"/></svg></span><span class="profile-check">✓</span></span>
+              <span class="profile-title">QUIC · UDP</span>
+              <span class="profile-desc">Отдельный вариант для сервисов с UDP-трафиком.</span>
+              <span class="profile-tags"><i>UDP / 443</i><i>MEDIA</i></span>
+            </button>
+          </div>
+        </section>
+
+        <div class="home-bottom-grid">
+          <section class="panel target-panel">
+            <div class="panel-heading"><span class="panel-index">03 / TARGETS</span><button class="text-link" type="button" data-navigate="route">Изменить <span>↗</span></button></div>
+            <h2>Что настроить?</h2>
+            <p class="panel-copy">Выбранные приложения сохраняются как предпочтения макета.</p>
+            <div class="app-chips" aria-label="Приложения для профиля">
+              <button class="app-chip is-on" type="button" data-app="youtube" aria-pressed="true"><span class="app-chip-mark mark-yt">▶</span>YouTube</button>
+              <button class="app-chip is-on" type="button" data-app="discord" aria-pressed="true"><span class="app-chip-mark mark-dc">◌</span>Discord</button>
+              <button class="app-chip" type="button" data-app="telegram" aria-pressed="false"><span class="app-chip-mark mark-tg">↗</span>Telegram</button>
+              <button class="app-chip" type="button" data-app="steam" aria-pressed="false"><span class="app-chip-mark mark-st">◈</span>Steam</button>
+            </div>
+          </section>
+          <section class="panel flowseal-panel">
+            <div class="panel-heading"><span class="panel-index">ENGINE NOTES</span><span class="mini-version">DEMO</span></div>
+            <h2>Знакомые режимы.<br><span>Простая навигация.</span></h2>
+            <p class="panel-copy">Профили собраны вокруг групп Flowseal: общий список, DNS и отдельные настройки QUIC/UDP.</p>
+            <button class="text-link" type="button" data-navigate="profiles">Посмотреть профильную сетку <span>→</span></button>
+            <span class="panel-orbit" aria-hidden="true"></span>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-profiles" data-view="profiles" aria-labelledby="profiles-title" hidden>
+        <div class="page-heading compact-heading">
+          <div><p class="eyebrow"><span class="eyebrow-mark"></span> PROFILE SELECTOR <span class="eyebrow-divider">/</span> 02</p><h1 id="profiles-title">Выбери свой <span>режим.</span></h1><p class="page-lede">Профиль задаёт набор настроек. Тип транспорта выбирается отдельно.</p></div>
+          <span class="page-code">CORE / FLOWSEAL FAMILY</span>
+        </div>
+        <div class="profile-grid profile-grid-full">
+          <button class="profile-card profile-card-large is-selected" type="button" data-profile="auto" aria-pressed="true">
+            <span class="profile-card-top"><span class="profile-glyph glyph-spark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-2 8h7L9 22l2-9H5l8-11Z"/></svg></span><span class="profile-check">✓</span></span>
+            <span class="profile-title">Авто · баланс</span><span class="profile-desc">Рекомендуемый старт: единый профиль для выбранных приложений с аккуратным поведением по умолчанию.</span>
+            <span class="profile-tags"><i>SMART</i><i>DEFAULT</i><i>LOW FRICTION</i></span>
+            <span class="profile-card-foot">01 <span>РЕКОМЕНДОВАНО</span></span>
+          </button>
+          <button class="profile-card profile-card-large" type="button" data-profile="general" aria-pressed="false">
+            <span class="profile-card-top"><span class="profile-glyph glyph-wave"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h3l3-7 5.5 14 3.5-7h3"/></svg></span><span class="profile-check">✓</span></span>
+            <span class="profile-title">Flowseal · General</span><span class="profile-desc">Общий профиль с адресными списками и настройками для популярных сайтов и приложений.</span>
+            <span class="profile-tags"><i>FLOWSEAL</i><i>TCP</i><i>LISTS</i></span>
+            <span class="profile-card-foot">02 <span>GENERAL</span></span>
+          </button>
+          <button class="profile-card profile-card-large" type="button" data-profile="quic" aria-pressed="false">
+            <span class="profile-card-top"><span class="profile-glyph glyph-udp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8m0-12.8L5.6 18.4"/><circle cx="12" cy="12" r="4.5"/></svg></span><span class="profile-check">✓</span></span>
+            <span class="profile-title">QUIC · UDP</span><span class="profile-desc">Профиль с отдельным переключателем для UDP/443. Удобно, когда нужен точный контроль трафика.</span>
+            <span class="profile-tags"><i>UDP / 443</i><i>QUIC</i><i>MEDIA</i></span>
+            <span class="profile-card-foot">03 <span>UDP FOCUS</span></span>
+          </button>
+          <button class="profile-card profile-card-large" type="button" data-profile="custom" aria-pressed="false">
+            <span class="profile-card-top"><span class="profile-glyph glyph-tune"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9m4 0h3M4 17h3m4 0h9M13 4v6M7 14v6"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span><span class="profile-check">✓</span></span>
+            <span class="profile-title">Точная настройка</span><span class="profile-desc">Сохрани собственные DNS, адрес прокси и выбор приложений в одной конфигурации.</span>
+            <span class="profile-tags"><i>CUSTOM</i><i>DNS</i><i>ROUTE</i></span>
+            <span class="profile-card-foot">04 <span>ADVANCED</span></span>
+          </button>
+        </div>
+        <div class="profile-callout panel">
+          <span class="callout-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v17m-7-7h14"/><circle cx="12" cy="12" r="9"/></svg></span>
+          <div><strong>Профиль и транспорт — разные вещи.</strong><p>Сначала выбери поведение, затем укажи, как направить трафик: через системный VPN, SOCKS5 или свой WebSocket-маршрут.</p></div>
+          <button class="button button-outline" type="button" data-navigate="route">Настроить маршрут <span>↗</span></button>
+        </div>
+      </section>
+
+      <section class="view" id="view-route" data-view="route" aria-labelledby="route-title" hidden>
+        <div class="page-heading compact-heading">
+          <div><p class="eyebrow"><span class="eyebrow-mark"></span> CONNECTION PATH <span class="eyebrow-divider">/</span> 03</p><h1 id="route-title">Куда направить <span>трафик?</span></h1><p class="page-lede">Выбери транспорт и заполни только нужные поля.</p></div>
+          <span class="page-code">ROUTE / CONFIGURATION</span>
+        </div>
+
+        <section class="route-section panel">
+          <div class="route-section-heading"><div><p class="panel-index">01 / TRANSPORT</p><h2>Способ подключения</h2></div><span class="small-hint">ОДИН ВЫБОР</span></div>
+          <div class="transport-grid">
+            <button class="transport-card is-selected" type="button" data-transport="tun" aria-pressed="true">
+              <span class="transport-card-icon icon-tun"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.6c0 4.3-2.9 7.3-7 8.9-4.1-1.6-7-4.6-7-8.9V6l7-2.5Z"/><path d="M8.5 12h7m-3.5-3.5v7"/></svg></span>
+              <span class="transport-card-copy"><strong>Android VPN <i>· TUN</i></strong><small>Системный маршрут для приложений</small></span><span class="transport-radio"></span>
+            </button>
+            <button class="transport-card" type="button" data-transport="socks" aria-pressed="false">
+              <span class="transport-card-icon icon-socks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14v9H5z"/><path d="M8 11h.01M11 11h.01M14 11h.01M17 11h.01M8 14h8"/><path d="M12 3.5v4M9.5 3.5h5"/></svg></span>
+              <span class="transport-card-copy"><strong>SOCKS5 <i>· local / Xray</i></strong><small>Локальный вход SOCKS5 для совместимого ядра</small></span><span class="transport-radio"></span>
+            </button>
+            <button class="transport-card" type="button" data-transport="ws" aria-pressed="false">
+              <span class="transport-card-icon icon-ws"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v11H9l-5 3v-14Z"/><path d="M8 10.5h8M8 13.5h5"/></svg></span>
+              <span class="transport-card-copy"><strong>WebSocket <i>· relay</i></strong><small>Укажи адрес своего WS/TG-шлюза</small></span><span class="transport-radio"></span>
+            </button>
+          </div>
+
+          <div class="transport-detail" id="transport-detail-tun" data-transport-detail="tun">
+            <div class="detail-info"><span class="detail-info-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.6c0 4.3-2.9 7.3-7 8.9-4.1-1.6-7-4.6-7-8.9V6l7-2.5Z"/><path d="m9 12 2 2 4-4"/></svg></span><div><strong>Системный VPN-маршрут</strong><p>Настройки для режима TUN. Выбор приложений — ниже.</p></div></div>
+            <div class="detail-flag"><span class="pulse-dot"></span> ГОТОВ К КОНФИГУРАЦИИ</div>
+          </div>
+          <div class="transport-detail" id="transport-detail-socks" data-transport-detail="socks" hidden>
+            <div class="form-grid">
+              <label class="field"><span>Хост SOCKS5</span><input id="socks-host" type="text" inputmode="url" autocomplete="off" placeholder="127.0.0.1" value="127.0.0.1"></label>
+              <label class="field field-port"><span>Порт</span><input id="socks-port" type="number" inputmode="numeric" min="1" max="65535" placeholder="2080" value="2080"></label>
+            </div>
+            <p class="field-help"><span>i</span> Для Xray укажи его локальный SOCKS5 inbound. Ссылки VLESS/VMess/Trojan требуют запущенного Xray-core; это поле не запускает его само.</p>
+          </div>
+          <div class="transport-detail" id="transport-detail-ws" data-transport-detail="ws" hidden>
+            <label class="field"><span>Адрес WebSocket-шлюза</span><input id="ws-endpoint" type="url" inputmode="url" autocomplete="url" placeholder="wss://relay.example:443"></label>
+            <p class="field-help"><span>i</span> Введи endpoint своего шлюза. В этом интерфейсе адрес только сохраняется.</p>
+          </div>
+        </section>
+
+        <div class="route-lower-grid">
+          <section class="panel dns-panel">
+            <div class="panel-heading"><span class="panel-index">02 / DNS</span><span class="dns-lock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10h12v10H6z"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3M12 14v2"/></svg> PRIVATE</span></div>
+            <h2>DNS-маршрут</h2>
+            <p class="panel-copy">Выбери источник DNS для профиля.</p>
+            <label class="field"><span class="sr-only">Режим DNS</span><select id="dns-mode"><option value="system">Системный DNS</option><option value="dot">DNS over TLS</option><option value="custom">Пользовательский DNS</option></select><span class="select-chevron">⌄</span></label>
+            <div class="dns-custom-row" id="dns-custom-row" hidden><label class="field"><span>Адрес DNS</span><input id="custom-dns" type="text" inputmode="url" placeholder="dns.example:853"></label></div>
+          </section>
+
+          <section class="panel apps-panel">
+            <div class="panel-heading"><span class="panel-index">03 / APP SCOPE</span><span class="small-hint">LOCAL PREFS</span></div>
+            <h2>Приложения</h2>
+            <p class="panel-copy">Отметь, какие приложения включить в выбранный маршрут.</p>
+            <div class="app-chips app-chips-route" aria-label="Выбор приложений">
+              <button class="app-chip is-on" type="button" data-app="youtube" aria-pressed="true"><span class="app-chip-mark mark-yt">▶</span>YouTube</button>
+              <button class="app-chip is-on" type="button" data-app="discord" aria-pressed="true"><span class="app-chip-mark mark-dc">◌</span>Discord</button>
+              <button class="app-chip" type="button" data-app="telegram" aria-pressed="false"><span class="app-chip-mark mark-tg">↗</span>Telegram</button>
+              <button class="app-chip" type="button" data-app="steam" aria-pressed="false"><span class="app-chip-mark mark-st">◈</span>Steam</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="route-actions">
+          <p><span class="action-spark">✦</span> Настройки сохраняются на этом устройстве.</p>
+          <button class="button button-primary" id="save-route" type="button"><span>Сохранить маршрут</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.5 17 19 7.5"/></svg></button>
+        </div>
+      </section>
+
+      <section class="view" id="view-activity" data-view="activity" aria-labelledby="activity-title" hidden>
+        <div class="page-heading compact-heading">
+          <div><p class="eyebrow"><span class="eyebrow-mark"></span> SESSION NOTES <span class="eyebrow-divider">/</span> 04</p><h1 id="activity-title">История <span>настроек.</span></h1><p class="page-lede">Здесь отображаются действия с профилями и параметрами этого интерфейса.</p></div>
+          <span class="page-code">LOCAL / DEMO</span>
+        </div>
+        <section class="panel activity-panel">
+          <div class="activity-header"><div><span class="panel-index">LOCAL EVENT LOG</span><h2>Журнал сессии</h2></div><button class="button button-outline button-small" id="clear-log" type="button">Очистить журнал</button></div>
+          <div class="activity-warning"><span class="warning-icon">i</span><p>Это журнал действий интерфейса. Он не показывает реальные сетевые пакеты или статус подключения.</p></div>
+          <ol class="event-list" id="event-list" aria-live="polite"></ol>
+        </section>
+        <section class="panel activity-info">
+          <span class="info-orbit" aria-hidden="true">✦</span><div><p class="panel-index">ZAPRET ARIS / BUILD 01</p><h2>Настройки — твои.</h2><p class="panel-copy">Профиль, транспорт, DNS и выбор приложений хранятся локально в браузере. Никакие значения не отправляются на сервер.</p></div>
+        </section>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Основная навигация">
+      <button class="nav-item is-active" type="button" data-navigate="home" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6.5 8 6.5v9H4z"/><path d="M9 19v-5h6v5"/></svg><span>Обзор</span>
+      </button>
+      <button class="nav-item" type="button" data-navigate="profiles">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v6H4zM13 5h7v6h-7zM4 13h7v6H4zM13 13h7v6h-7z"/></svg><span>Профили</span>
+      </button>
+      <button class="nav-item" type="button" data-navigate="route">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 18h3a4 4 0 0 0 4-4V10a4 4 0 0 1 4-4"/></svg><span>Маршрут</span>
+      </button>
+      <button class="nav-item" type="button" data-navigate="activity">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14v15H5zM8 8h8M8 12h8M8 16h4"/></svg><span>Журнал</span>
+      </button>
+    </nav>
+
+    <footer class="app-footer"><span>ZAPRET ARIS <i>·</i> INTERFACE STUDY</span><span>Настройки остаются на устройстве</span></footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
