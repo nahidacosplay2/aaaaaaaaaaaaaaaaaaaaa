@@ -48,7 +48,7 @@ jobs:
           printf 'variant=release\napplicationId=app.zapret.aris\nsourceCommit=%s\nsigning=ephemeral CI debug key; test-only, not suitable for stable updates or Google Play\n' "$GITHUB_SHA" > app/build/outputs/apk/release/build-info.txt
 
       - name: Upload testable APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: ZapretAris-release-${{ github.sha }}
           path: |
