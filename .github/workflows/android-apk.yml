@@ -43,6 +43,7 @@ jobs:
           set -euo pipefail
           apk='app/build/outputs/apk/release/app-release.apk'
           test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
           sha256sum "$apk" > "$apk.sha256"
           printf 'variant=release\napplicationId=app.zapret.aris\nsourceCommit=%s\nsigning=ephemeral CI debug key; test-only, not suitable for stable updates or Google Play\n' "$GITHUB_SHA" > app/build/outputs/apk/release/build-info.txt

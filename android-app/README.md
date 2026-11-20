@@ -6,7 +6,7 @@
 - **SOCKS5:** Android VPN направляет трафик через настроенный SOCKS5-сервер. Можно указать адрес, порт и учётные данные; для UDP сервер должен поддерживать `UDP ASSOCIATE`. Настройки принимают SOCKS5 endpoint, а не ссылки VLESS/VMess. Xray можно использовать, если он предоставляет SOCKS inbound.
 - **Прокси Telegram:** отдельная дополнительная функция; она не заменяет ни один из двух маршрутов.
 
-**Статус:** в репозитории пока нет готового APK или публичного релиза. Android-сборка, VPN-маршрутизация, DNS и UDP на устройстве ещё не проверены. Кнопка теста SOCKS5 проверяет TCP handshake и тестовое TCP-соединение; сама по себе она не подтверждает работу UDP, DNS или системного VPN-туннеля.
+**Статус:** GitHub Actions успешно собрал release-вариант APK и проверил его подпись; APK, SHA-256 и build-info прикреплены к [последнему успешному запуску workflow](https://github.com/nahidacosplay2/aaaaaaaaaaaaaaaaaaaaa/actions/workflows/android-apk.yml) на 14 дней. APK не хранится в Git и не является публичным релизом: без постоянного keystore CI подписывает его временным debug-ключом. VPN-маршрутизация, DNS, UDP и приложение на устройстве ещё не проверены. Кнопка теста SOCKS5 проверяет TCP handshake и тестовое TCP-соединение; сама по себе она не подтверждает работу UDP, DNS или системного VPN-туннеля.
 
 Исходная кодовая база основана на [Zapret Cap для Linux](https://github.com/CapptainnCWC/zapret-cap). В проекте также используются стратегии [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube), [zapret2](https://github.com/bol-van/zapret2) от bol-van, прокси для Telegram [tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy), ByeDPI и HEV. Лицензии перечислены в [THIRD_PARTY.md](THIRD_PARTY.md).
 
