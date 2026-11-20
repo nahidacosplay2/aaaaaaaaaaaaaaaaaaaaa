@@ -251,7 +251,9 @@ public class BypassVpnService extends VpnService {
                     successes = 0;
                 }
                 probeInFlight.set(false);
-                runOnWorker(() -> finishStrategyProbe(sampledStrategy, sampledPort, sampledEngine, sampledNetwork, successes));
+                int completedSuccesses = successes;
+                runOnWorker(() -> finishStrategyProbe(sampledStrategy, sampledPort, sampledEngine,
+                        sampledNetwork, completedSuccesses));
             });
         } catch (RejectedExecutionException serviceAlreadyDestroyed) {
             probeInFlight.set(false);
