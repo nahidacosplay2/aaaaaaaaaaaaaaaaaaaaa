@@ -285,7 +285,23 @@
                 android:textSize="14sp" />
         </LinearLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/quick_test"
+        style="@style/TonalButton"
+        android:layout_width="match_parent"
+        android:layout_marginTop="8dp"
+        android:text="@string/quick_test_button"
+        android:textSize="12sp" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/diagnostics"
+        style="@style/TonalButton"
+        android:layout_width="match_parent"
+        android:layout_marginTop="8dp"
+        android:text="@string/diagnostics_button"
+        android:textSize="12sp" />
 
     <LinearLayout
         style="@style/Card"
@@ -378,6 +394,35 @@
         <TextView android:id="@+id/tab_wifi" style="@style/Segment" />
         <TextView android:id="@+id/tab_cell" style="@style/Segment" />
     </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/config_filters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_segments"
+        android:orientation="horizontal"
+        android:padding="3dp">
+
+        <TextView
+            android:id="@+id/filter_all"
+            style="@style/Segment"
+            android:text="@string/config_filter_all" />
+
+        <TextView
+            android:id="@+id/filter_favorites"
+            style="@style/Segment"
+            android:text="@string/config_filter_favorites" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/config_empty_favorites"
+        style="@style/Muted"
+        android:layout_marginTop="8dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:text="@string/config_favorites_empty"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/hint"

@@ -17,6 +17,7 @@ final class AppState {
     static volatile Phase phase = Phase.OFF;
     static volatile String strategy;
     static volatile String error;
+    static volatile String routeNotice;
 
     static volatile Phase tgPhase = Phase.OFF;
     static volatile org.zapretcap.tgproxy.TgWsProxy tgProxy;
@@ -33,6 +34,11 @@ final class AppState {
         phase = newPhase;
         strategy = newStrategy;
         error = newError;
+        notifyListener();
+    }
+
+    static void setRouteNotice(String notice) {
+        routeNotice = notice;
         notifyListener();
     }
 

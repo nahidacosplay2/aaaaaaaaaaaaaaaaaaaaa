@@ -16,7 +16,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Стратегии, списки и фейки: лежат в assets, движкам нужны как обычные файлы. */
 final class Data {
@@ -29,6 +32,15 @@ final class Data {
     static final String PUSH_PORTS = "5228-5230";
     static final String STRATEGY_KEY_PREFIX = "strategy:";
     static final String SCORE_KEY_PREFIX = "score:";
+    static final String FAVORITES_KEY = "favorite_strategies";
+    static final String AUTO_FAILOVER_KEY = "auto_failover_enabled";
+    static final String FAILURE_ACTION_KEY = "failure_action";
+    static final String FAILURE_ACTION_STOP = "stop";
+    static final String FAILURE_ACTION_DIRECT = "direct";
+    static final String LAST_WORKING_PREFIX = "last_working:";
+    static final String FAILED_STRATEGY_PREFIX = "strategy_failed:";
+    /** Повторно проверять недавно неработавшую стратегию не чаще раза за полчаса. */
+    static final long STRATEGY_FAILURE_COOLDOWN_MS = 30L * 60L * 1000L;
 
     private Data() {
     }
@@ -144,6 +156,96 @@ final class Data {
             editor.putString(STRATEGY_KEY_PREFIX + scope, name);
         }
         editor.apply();
+    }
+
+    /** Failover only replaces the selection for this exact network; other Wi-Fi profiles stay untouched. */
+    static void setFailoverStrategyFor(Context context, String kind, String name) {
+        String scope = NetKind.scope(context, kind);
+        BypassVpnService.prefs(context).edit().putString(STRATEGY_KEY_PREFIX + scope, name).apply();
+    }
+
+    /** Избранное общее для сетей: это предпочтения человека, а не оценка конфигурации. */
+    static Set<String> favorites(Context context) {
+        Set<String> saved = BypassVpnService.prefs(context).getStringSet(FAVORITES_KEY, Collections.emptySet());
+        return saved == null ? new LinkedHashSet<>() : new LinkedHashSet<>(saved);
+    }
+
+    static boolean isFavorite(Context context, String strategy) {
+        return favorites(context).contains(strategy);
+    }
+
+    static boolean toggleFavorite(Context context, String strategy) {
+        Set<String> favorites = favorites(context);
+        boolean added;
+        if (favorites.remove(strategy)) {
+            added = false;
+        } else {
+            favorites.add(strategy);
+            added = true;
+        }
+        BypassVpnService.prefs(context).edit().putStringSet(FAVORITES_KEY, new HashSet<>(favorites)).apply();
+        return added;
+    }
+
+    static boolean autoFailoverEnabled(Context context) {
+        return BypassVpnService.prefs(context).getBoolean(AUTO_FAILOVER_KEY, true);
+    }
+
+    static void setAutoFailoverEnabled(Context context, boolean enabled) {
+        BypassVpnService.prefs(context).edit().putBoolean(AUTO_FAILOVER_KEY, enabled).apply();
+    }
+
+    static String failureAction(Context context) {
+        String action = BypassVpnService.prefs(context).getString(FAILURE_ACTION_KEY, FAILURE_ACTION_STOP);
+        return FAILURE_ACTION_DIRECT.equals(action) ? FAILURE_ACTION_DIRECT : FAILURE_ACTION_STOP;
+    }
+
+    static void setFailureAction(Context context, String action) {
+        if (!FAILURE_ACTION_DIRECT.equals(action) && !FAILURE_ACTION_STOP.equals(action)) {
+            throw new IllegalArgumentException("unknown failure action");
+        }
+        BypassVpnService.prefs(context).edit().putString(FAILURE_ACTION_KEY, action).apply();
+    }
+
+    /** Only the exact network scope is eligible; the generic Wi-Fi choice may belong to another router. */
+    static String lastWorking(Context context, String kind) {
+        String scope = NetKind.scope(context, kind);
+        return BypassVpnService.prefs(context).getString(LAST_WORKING_PREFIX + scope, null);
+    }
+
+    /** Запоминаем только стратегию, проверенную по реальной TLS-связи, а не только запущенный процесс. */
+    static void markWorking(Context context, String kind, String strategy) {
+        String scope = NetKind.scope(context, kind);
+        BypassVpnService.prefs(context).edit()
+                .putString(LAST_WORKING_PREFIX + scope, strategy)
+                .remove(failedStrategyKey(scope, strategy))
+                .apply();
+    }
+
+    static void markFailed(Context context, String kind, String strategy) {
+        String scope = NetKind.scope(context, kind);
+        BypassVpnService.prefs(context).edit()
+                .putLong(failedStrategyKey(scope, strategy), System.currentTimeMillis())
+                .apply();
+    }
+
+    static void clearFailure(Context context, String kind, String strategy) {
+        SharedPreferences.Editor editor = BypassVpnService.prefs(context).edit();
+        for (String scope : NetKind.scopes(context, kind)) {
+            editor.remove(failedStrategyKey(scope, strategy));
+        }
+        editor.apply();
+    }
+
+    static boolean recentlyFailed(Context context, String kind, String strategy, long now) {
+        SharedPreferences prefs = BypassVpnService.prefs(context);
+        String scope = NetKind.scope(context, kind);
+        long failedAt = prefs.getLong(failedStrategyKey(scope, strategy), 0L);
+        return failedAt > 0 && now - failedAt >= 0 && now - failedAt < STRATEGY_FAILURE_COOLDOWN_MS;
+    }
+
+    private static String failedStrategyKey(String scope, String strategy) {
+        return FAILED_STRATEGY_PREFIX + scope + ":" + strategy;
     }
 
     /** Строка из самой точной записи, где она есть: сеть по имени, по адресам, общая для вида сети. */

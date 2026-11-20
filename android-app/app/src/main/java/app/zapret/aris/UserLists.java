@@ -192,6 +192,72 @@ final class UserLists {
         changed = true;
     }
 
+    /** Replace all imported lists as one staged operation; on a rename failure, restore every prior file. */
+    static synchronized void replaceAll(Context context, java.util.Map<Kind, List<String>> restored) throws IOException {
+        for (Kind kind : Kind.values()) {
+            if (restored.get(kind) == null) {
+                throw new IOException("missing domain list " + kind.id);
+            }
+        }
+        rememberBuiltin(context);
+        File dir = new File(context.getFilesDir(), "user-lists");
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            throw new IOException("mkdir " + dir);
+        }
+        String token = Long.toHexString(System.nanoTime());
+        java.util.Map<Kind, File> staged = new java.util.EnumMap<>(Kind.class);
+        java.util.Map<Kind, File> backups = new java.util.EnumMap<>(Kind.class);
+        List<Kind> committed = new ArrayList<>();
+        try {
+            for (Kind kind : Kind.values()) {
+                File temp = new File(dir, kind.id + "." + token + ".import.tmp");
+                staged.put(kind, temp);
+                try (OutputStream out = new FileOutputStream(temp)) {
+                    out.write((String.join("\n", restored.get(kind)) + "\n").getBytes(StandardCharsets.UTF_8));
+                }
+                backups.put(kind, new File(dir, kind.id + "." + token + ".import.bak"));
+            }
+            for (Kind kind : Kind.values()) {
+                File target = file(context, kind);
+                File backup = backups.get(kind);
+                if (target.exists() && !target.renameTo(backup)) {
+                    throw new IOException("backup " + target);
+                }
+                if (!staged.get(kind).renameTo(target)) {
+                    throw new IOException("rename " + target);
+                }
+                committed.add(kind);
+            }
+        } catch (IOException failure) {
+            for (int i = Kind.values().length - 1; i >= 0; i--) {
+                Kind kind = Kind.values()[i];
+                File target = file(context, kind);
+                File backup = backups.get(kind);
+                if (backup != null && backup.exists()) {
+                    if (target.exists() && !target.delete()) {
+                        failure.addSuppressed(new IOException("delete partial " + target));
+                    }
+                    if (!backup.renameTo(target)) {
+                        failure.addSuppressed(new IOException("restore " + target));
+                    }
+                } else if (committed.contains(kind) && target.exists() && !target.delete()) {
+                    failure.addSuppressed(new IOException("delete partial " + target));
+                }
+                File temp = staged.get(kind);
+                if (temp != null && temp.exists() && !temp.delete()) {
+                    failure.addSuppressed(new IOException("delete staged " + temp));
+                }
+            }
+            throw failure;
+        }
+        for (File backup : backups.values()) {
+            if (backup.exists()) {
+                backup.delete();
+            }
+        }
+        changed = true;
+    }
+
     /**
      * Домен попадает ровно в один список: в разных конфигах группы идут в разном порядке,
      * и домен из двух списков работал бы то так, то эдак.

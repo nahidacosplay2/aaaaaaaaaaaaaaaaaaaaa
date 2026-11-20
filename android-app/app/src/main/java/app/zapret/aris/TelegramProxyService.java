@@ -11,7 +11,9 @@ import android.content.pm.ServiceInfo;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 
 import org.zapretcap.tgproxy.ProxyConfig;
@@ -22,6 +24,7 @@ import java.io.IOException;
 import java.net.BindException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /** Держит прокси Telegram запущенным, пока он включён, независимо от обхода. */
 public class TelegramProxyService extends Service {
@@ -32,39 +35,65 @@ public class TelegramProxyService extends Service {
     private static final int NOTIFICATION_ID = 2;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private TgWsProxy proxy;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private volatile TgWsProxy proxy;
     private final TgEngine engine = new TgEngine();
     private Network lastNetwork;
+    private final Runnable networkSettled = this::onNetworkSettled;
 
-    /** Соединения привязаны к сети, поэтому при её смене их нужно открыть заново. */
+    /** Соединения привязаны к сети, поэтому при её смене нужно дождаться перехода Wi-Fi ↔ мобильная. */
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override
         public void onAvailable(Network network) {
-            // событие может быть и про туннель обхода: соединения прокси от него не зависят, рвать их незачем
-            Network physical = NetKind.physical(TelegramProxyService.this);
-            if (physical == null) {
-                return;
-            }
-            if (lastNetwork != null && !lastNetwork.equals(physical)) {
-                TgWsProxy current = proxy;
-                if (current != null) {
-                    current.networkChanged();
-                    // соединения движка привязаны к старой сети, а TTL конфига хранится для каждой сети свой
-                    worker.execute(() -> {
-                        if (proxy != null) {
-                            engine.start(TelegramProxyService.this);
-                        }
-                    });
-                }
-            }
-            lastNetwork = physical;
+            onNetworkEvent();
+        }
+
+        @Override
+        public void onCapabilitiesChanged(Network network, android.net.NetworkCapabilities capabilities) {
+            onNetworkEvent();
+        }
+
+        @Override
+        public void onLinkPropertiesChanged(Network network, android.net.LinkProperties properties) {
+            onNetworkEvent();
         }
 
         @Override
         public void onLost(Network network) {
-            onAvailable(network);
+            onNetworkEvent();
         }
     };
+
+    private void onNetworkEvent() {
+        main.removeCallbacks(networkSettled);
+        main.postDelayed(networkSettled, 1500);
+    }
+
+    private void onNetworkSettled() {
+        Network physical = NetKind.physical(this);
+        if (physical == null || (lastNetwork != null && lastNetwork.equals(physical))) {
+            return;
+        }
+        boolean changed = lastNetwork != null;
+        lastNetwork = physical;
+        if (!changed) {
+            return;
+        }
+        TgWsProxy current = proxy;
+        if (current != null) {
+            current.networkChanged();
+            // Соединения движка привязаны к старой сети, TTL и стратегия — к новой.
+            try {
+                worker.execute(() -> {
+                    if (proxy != null) {
+                        engine.start(TelegramProxyService.this);
+                    }
+                });
+            } catch (RejectedExecutionException stopped) {
+                Log.i(TAG, "network changed while the proxy service was stopping");
+            }
+        }
+    }
 
     static void start(Context context) {
         launch(context, ACTION_START);
@@ -124,6 +153,7 @@ public class TelegramProxyService extends Service {
 
     @Override
     public void onDestroy() {
+        main.removeCallbacksAndMessages(null);
         getSystemService(ConnectivityManager.class).unregisterNetworkCallback(networkCallback);
         worker.execute(this::stopProxy);
         worker.shutdown();
@@ -143,7 +173,7 @@ public class TelegramProxyService extends Service {
             engine.start(this);
             next.start();
             proxy = next;
-            AppState.setTg(AppState.Phase.ON, next, null);
+            AppState.setTg(AppState.Phase.ON, next, TgEngine.notice());
         } catch (BindException e) {
             next.stop();
             fail(getString(R.string.tg_error_port, config.port));

@@ -21,15 +21,32 @@ final class TgEngine {
     /** Значение настройки «без обхода». */
     static final String DIRECT = "";
     private static final long RESTART_DELAY_MS = 2000;
+    private static final long RESTART_WINDOW_MS = 5 * 60_000L;
+    private static final int MAX_QUICK_RESTARTS = 3;
+    private static volatile String statusNotice;
 
     private Process process;
     private volatile boolean wanted;
+    private int quickRestarts;
+    private long lastEngineStart;
+
+    static String notice() {
+        return statusNotice;
+    }
 
     /** Запускает движок по настройкам прокси или выключает его. Вызывать с потока службы. */
     synchronized void start(Context context) {
+        start(context, true);
+    }
+
+    private synchronized void start(Context context, boolean resetFailures) {
         stop();
+        if (resetFailures) {
+            quickRestarts = 0;
+        }
         String strategy = TgProxySettings.strategy(context);
         if (DIRECT.equals(strategy)) {
+            statusNotice = null;
             Log.i(TAG, "Обход для прокси: без обхода");
             return;
         }
@@ -49,18 +66,23 @@ final class TgEngine {
                 throw new IOException("движок не запустился");
             }
             Dialer.setSocksPort(port);
+            lastEngineStart = System.currentTimeMillis();
+            statusNotice = null;
             Log.i(TAG, "Обход для прокси: " + strategy);
-            watch(context, started);
+            watch(context.getApplicationContext(), started);
         } catch (IOException | RuntimeException e) {
             // без движка прокси работает напрямую, это лучше, чем совсем без связи
-            Log.w(TAG, "Обход для прокси не запустился, прокси идёт напрямую: " + e.getMessage());
+            String message = String.valueOf(e.getMessage());
+            Log.w(TAG, "Обход для прокси не запустился, прокси идёт напрямую: " + message);
             stop();
+            statusNotice = context.getString(R.string.tg_engine_fallback, message);
         }
     }
 
     synchronized void stop() {
         wanted = false;
         Dialer.setSocksPort(0);
+        statusNotice = null;
         Process old = process;
         process = null;
         if (old != null) {
@@ -81,22 +103,36 @@ final class TgEngine {
             } catch (InterruptedException e) {
                 return;
             }
+            long delay;
             synchronized (this) {
                 if (process != started || !wanted) {
                     return;
                 }
                 Dialer.setSocksPort(0);
                 process = null;
+                long now = System.currentTimeMillis();
+                if (now - lastEngineStart > RESTART_WINDOW_MS) {
+                    quickRestarts = 0;
+                }
+                quickRestarts++;
+                if (quickRestarts > MAX_QUICK_RESTARTS) {
+                    wanted = false;
+                    statusNotice = context.getString(R.string.tg_engine_direct_fallback);
+                    Log.w(TAG, "движок прокси несколько раз быстро завершился; оставляем прямой маршрут до следующего запуска");
+                    return;
+                }
+                delay = Math.min(RESTART_DELAY_MS << Math.min(quickRestarts - 1, 4), 30_000L);
+                statusNotice = context.getString(R.string.tg_engine_restarting);
             }
-            Log.w(TAG, "Движок прокси завершился, перезапуск");
+            Log.w(TAG, "Движок прокси завершился, повтор через " + delay / 1000 + " с");
             try {
-                Thread.sleep(RESTART_DELAY_MS);
+                Thread.sleep(delay);
             } catch (InterruptedException e) {
                 return;
             }
             synchronized (this) {
                 if (wanted && process == null) {
-                    start(context);
+                    start(context, false);
                 }
             }
         }, "tg-engine-watch");

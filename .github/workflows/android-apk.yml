@@ -37,6 +37,10 @@ jobs:
         working-directory: android-app
         run: ./gradlew --no-daemon --stacktrace assembleRelease
 
+      - name: Run Telegram proxy unit tests
+        working-directory: android-app
+        run: tests/tgproxy-test.sh unit
+
       - name: Verify and checksum APK
         working-directory: android-app
         run: |

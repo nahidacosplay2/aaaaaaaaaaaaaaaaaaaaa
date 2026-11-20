@@ -42,6 +42,43 @@
 
         <LinearLayout style="@style/Card" android:layout_marginTop="12dp">
 
+            <TextView style="@style/SectionTitle" android:text="@string/failover_title" />
+            <TextView style="@style/Muted" android:layout_marginTop="4dp" android:text="@string/failover_hint" />
+
+            <Switch
+                android:id="@+id/auto_failover_enabled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/failover_enabled"
+                android:textColor="@color/on_surface" />
+
+            <TextView style="@style/SettingsLabel" android:text="@string/failure_action_title" />
+            <Spinner
+                android:id="@+id/failure_action"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card" android:layout_marginTop="10dp">
+            <TextView style="@style/SectionTitle" android:text="@string/settings_transfer_title" />
+            <TextView style="@style/Muted" android:layout_marginTop="4dp" android:text="@string/settings_transfer_hint" />
+            <TextView
+                android:id="@+id/settings_export"
+                style="@style/TonalButton"
+                android:layout_width="match_parent"
+                android:layout_marginTop="10dp"
+                android:text="@string/settings_export" />
+            <TextView
+                android:id="@+id/settings_import"
+                style="@style/TonalButton"
+                android:layout_width="match_parent"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_import" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card" android:layout_marginTop="12dp">
+
             <TextView style="@style/SectionTitle" android:text="@string/ipset_title" />
 
             <LinearLayout

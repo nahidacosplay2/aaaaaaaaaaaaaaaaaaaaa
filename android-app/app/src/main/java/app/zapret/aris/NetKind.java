@@ -185,18 +185,20 @@ final class NetKind {
     }
 
     /**
-     * Записи, в которых ищется выбор, от самой точной: по имени сети, по адресам роутера, общая для Wi-Fi.
-     * Запись по адресам остаётся запасной: имя бывает недоступно, если выключить геолокацию.
+     * Записи, в которых ищется выбор: по отпечатку адресов, затем по имени сети, затем общая для Wi-Fi.
+     * Отпечаток нужен первым, чтобы failover службы без доступа к SSID был виден экрану с таким доступом.
      */
     static List<String> scopes(Context context, String kind) {
         List<String> scopes = new ArrayList<>();
         if (WIFI.equals(kind)) {
             WifiId id = wifiId(context);
             if (id != null) {
+                // Prefer the address fingerprint: the background VPN service may not have permission to read SSID.
+                // A failover written under this fingerprint must override a stale SSID-specific selection in the UI.
+                scopes.add(WIFI + "@" + id.id);
                 if (id.ssid != null) {
                     scopes.add(WIFI + "#" + hash("ssid:" + id.ssid));
                 }
-                scopes.add(WIFI + "@" + id.id);
             }
         }
         scopes.add(kind);

@@ -1,6 +1,9 @@
 package app.zapret.aris;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -22,6 +25,9 @@ import java.util.concurrent.Executors;
 
 /** Настройки обхода из service.bat Windows-версии, которые работают без root. */
 public class BypassSettingsActivity extends Activity {
+    private static final int REQUEST_EXPORT = 90;
+    private static final int REQUEST_IMPORT = 91;
+
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private TextView[] ipsetTabs;
@@ -29,6 +35,8 @@ public class BypassSettingsActivity extends Activity {
     private TextView hostsInfo;
     private View ipsetUpdate;
     private View hostsUpdate;
+    private View exportSettings;
+    private View importSettings;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +44,11 @@ public class BypassSettingsActivity extends Activity {
         setContentView(R.layout.activity_bypass_settings);
         SystemBars.apply(this);
         findViewById(R.id.back).setOnClickListener(v -> finish());
+        setupFailover();
+        exportSettings = findViewById(R.id.settings_export);
+        importSettings = findViewById(R.id.settings_import);
+        exportSettings.setOnClickListener(v -> chooseExport());
+        importSettings.setOnClickListener(v -> confirmImport());
 
         ipsetTabs = new TextView[]{findViewById(R.id.ipset_none), findViewById(R.id.ipset_loaded), findViewById(R.id.ipset_any)};
         BypassSettings.IpsetMode[] modes = {BypassSettings.IpsetMode.NONE, BypassSettings.IpsetMode.LOADED, BypassSettings.IpsetMode.ANY};
@@ -62,6 +75,138 @@ public class BypassSettingsActivity extends Activity {
         setupTtl(findViewById(R.id.fake_ttl_cell), NetKind.CELL);
         showIpset();
         showHosts();
+    }
+
+
+    private void setupFailover() {
+        Switch enabled = findViewById(R.id.auto_failover_enabled);
+        enabled.setChecked(Data.autoFailoverEnabled(this));
+        enabled.setOnCheckedChangeListener((button, checked) -> Data.setAutoFailoverEnabled(this, checked));
+
+        Spinner action = findViewById(R.id.failure_action);
+        List<String> labels = java.util.Arrays.asList(
+                getString(R.string.failure_action_stop), getString(R.string.failure_action_direct));
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        action.setAdapter(adapter);
+        action.setSelection(Data.failureAction(this).equals(Data.FAILURE_ACTION_DIRECT) ? 1 : 0, false);
+        action.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                Data.setFailureAction(BypassSettingsActivity.this,
+                        position == 1 ? Data.FAILURE_ACTION_DIRECT : Data.FAILURE_ACTION_STOP);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private void chooseExport() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json")
+                .putExtra(Intent.EXTRA_TITLE, "zapret-aris-settings.json");
+        startActivityForResult(intent, REQUEST_EXPORT);
+    }
+
+    private void confirmImport() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.settings_import_confirm_title)
+                .setMessage(R.string.settings_import_confirm)
+                .setPositiveButton(R.string.settings_import, (dialog, which) -> chooseImport())
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void chooseImport() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json");
+        startActivityForResult(intent, REQUEST_IMPORT);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        if (requestCode == REQUEST_EXPORT) {
+            worker.execute(() -> exportFile(uri));
+        } else if (requestCode == REQUEST_IMPORT) {
+            worker.execute(() -> importFile(uri));
+        }
+    }
+
+    private void exportFile(Uri uri) {
+        String message;
+        try {
+            byte[] contents = SettingsTransfer.export(this);
+            try (java.io.OutputStream output = getContentResolver().openOutputStream(uri, "w")) {
+                if (output == null) {
+                    throw new IOException("не удалось открыть файл для записи");
+                }
+                output.write(contents);
+                output.flush();
+            }
+            message = getString(R.string.settings_export_done);
+        } catch (IOException | org.json.JSONException | RuntimeException e) {
+            message = getString(R.string.settings_transfer_failed, String.valueOf(e.getMessage()));
+        }
+        String result = message;
+        main.post(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void importFile(Uri uri) {
+        String message;
+        boolean imported = false;
+        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) {
+                throw new IOException("не удалось открыть файл");
+            }
+            SettingsTransfer.importFrom(this, input);
+            imported = true;
+            message = getString(R.string.settings_import_done);
+        } catch (IOException | org.json.JSONException | RuntimeException e) {
+            message = getString(R.string.settings_transfer_failed, String.valueOf(e.getMessage()));
+        }
+        String result = message;
+        boolean restart = imported;
+        main.post(() -> {
+            if (isFinishing() || isDestroyed()) {
+                return;
+            }
+            Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+            if (restart) {
+                applyImportedSettings();
+                finish();
+            }
+        });
+    }
+
+    private void applyImportedSettings() {
+        UserLists.consumeChanged();
+        BypassSettings.consumeChanged();
+        ConnectionMode.consumeChanged();
+        Socks5Settings.consumeChanged();
+        if (AppState.phase != AppState.Phase.OFF) {
+            Intent intent = new Intent(this, BypassVpnService.class).setAction(BypassVpnService.ACTION_START);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+        }
+        if (TgProxySettings.prefs(this).getBoolean(TgProxySettings.ENABLED, false)) {
+            TelegramProxyService.restart(this);
+        }
     }
 
     @Override

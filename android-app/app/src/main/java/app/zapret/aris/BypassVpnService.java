@@ -30,9 +30,13 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Owns the Android TUN route. Zapret mode sends it through HEV to the local ByeDPI engine;
@@ -55,16 +59,23 @@ public class BypassVpnService extends VpnService {
      */
     private static final int TCP_IDLE_TIMEOUT_MS = 60 * 60 * 1000;
     private static final int NOTIFICATION_ID = 1;
+    private static final int FAILURE_NOTIFICATION_ID = 4;
 
     /** Запуск, смена стратегии и остановка идут строго по очереди. */
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final ExecutorService probeWorker = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean probeInFlight = new AtomicBoolean();
 
     /** Сеть меняется рывками, особенно при переходе Wi-Fi - мобильная: реагируем, когда она успокоилась. */
     private static final long NETWORK_SETTLE_MS = 1500;
-    /** Движок перезапускается сам, но падение чаще раза в 20 секунд значит, что конфиг ему не подходит. */
+    /** Несколько падений в пределах двух минут означают, что стратегию лучше сменить. */
     private static final int MAX_QUICK_RESTARTS = 3;
-    private static final long QUICK_RESTART_MS = 20_000;
+    private static final long QUICK_RESTART_MS = 2 * 60_000L;
     private static final long HEALTH_INTERVAL_MS = 30_000;
+    private static final long STRATEGY_PROBE_INTERVAL_MS = 60_000L;
+    private static final long STRATEGY_PROBE_INITIAL_DELAY_MS = 45_000L;
+    private static final int STRATEGY_PROBE_FAILURE_LIMIT = 3;
+    private static final int MAX_AUTOMATIC_SWITCHES = 5;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Runnable networkSettled = () -> runOnWorker(this::onNetworkSettled);
@@ -115,6 +126,11 @@ public class BypassVpnService extends VpnService {
     private int dnsPort;
     private int quickRestarts;
     private long lastEngineStart;
+    private long nextStrategyProbeAt;
+    private int consecutiveProbeFailures;
+    private int failoverAttempts;
+    private String failoverFrom;
+    private String failoverReason;
 
     static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences("settings", MODE_PRIVATE);
@@ -139,8 +155,12 @@ public class BypassVpnService extends VpnService {
         }
         // Без intent и без ACTION_START служба поднята системой: постоянная VPN или перезапуск после сбоя
         String name = routeName();
+        boolean manualStart = intent != null && ACTION_START.equals(intent.getAction());
+        if (manualStart && !ConnectionMode.isSocks5(this)) {
+            Data.clearFailure(this, NetKind.current(this), name);
+        }
         showNotification(name);
-        runOnWorker(() -> start(name));
+        runOnWorker(() -> start(name, manualStart));
         return START_STICKY;
     }
 
@@ -167,7 +187,10 @@ public class BypassVpnService extends VpnService {
             return;
         }
         Log.i(TAG, "network changed: " + network + " -> " + next);
-        start(routeName());
+        failoverAttempts = 0;
+        consecutiveProbeFailures = 0;
+        quickRestarts = 0;
+        start(routeName(), false);
     }
 
     /** Both the SOCKS engine and the TUN bridge must be alive for routed traffic to make progress. */
@@ -197,17 +220,83 @@ public class BypassVpnService extends VpnService {
                 Log.e(TAG, "ciadpi not responding, restarting");
                 restartAfterFailure("Движок не отвечает");
             }
+            return;
+        }
+        scheduleStrategyProbe();
+    }
+
+    private void scheduleStrategyProbe() {
+        long now = System.currentTimeMillis();
+        String sampledStrategy = strategy;
+        int sampledPort = ciadpiPort;
+        Process sampledEngine = ciadpi;
+        Network sampledNetwork = network;
+        if (sampledStrategy == null || sampledEngine == null || sampledNetwork == null
+                || !sampledNetwork.equals(NetKind.physical(this))
+                || now < nextStrategyProbeAt || !probeInFlight.compareAndSet(false, true)) {
+            return;
+        }
+        nextStrategyProbeAt = now + STRATEGY_PROBE_INTERVAL_MS;
+        try {
+            probeWorker.execute(() -> {
+                int successes;
+                try {
+                    successes = StrategyHealthProbe.successes(sampledNetwork, sampledPort);
+                } catch (InterruptedException stopped) {
+                    Thread.currentThread().interrupt();
+                    probeInFlight.set(false);
+                    return;
+                } catch (RuntimeException failedProbe) {
+                    Log.w(TAG, "strategy health probe failed", failedProbe);
+                    successes = 0;
+                }
+                probeInFlight.set(false);
+                runOnWorker(() -> finishStrategyProbe(sampledStrategy, sampledPort, sampledEngine, sampledNetwork, successes));
+            });
+        } catch (RejectedExecutionException serviceAlreadyDestroyed) {
+            probeInFlight.set(false);
+        }
+    }
+
+    private void finishStrategyProbe(String sampledStrategy, int sampledPort, Process sampledEngine,
+                                      Network sampledNetwork, int successes) {
+        Network physicalNow = NetKind.physical(this);
+        boolean sameNetwork = sampledNetwork.equals(network) && sampledNetwork.equals(physicalNow);
+        if (tun == null || AppState.phase != AppState.Phase.ON || ConnectionMode.isSocks5(this)
+                || !sampledStrategy.equals(strategy) || sampledPort != ciadpiPort
+                || sampledEngine != ciadpi || !Data.isAlive(sampledEngine) || !sameNetwork) {
+            return;
+        }
+        if (successes >= 2) {
+            if (consecutiveProbeFailures > 0) {
+                Log.i(TAG, "strategy health recovered: " + sampledStrategy + " (" + successes + "/3)");
+            }
+            consecutiveProbeFailures = 0;
+            failoverAttempts = 0;
+            quickRestarts = 0;
+            Data.markWorking(this, NetKind.current(this), sampledStrategy);
+            return;
+        }
+        consecutiveProbeFailures++;
+        Log.w(TAG, "strategy probe failed: " + sampledStrategy + " (" + successes + "/3, "
+                + consecutiveProbeFailures + "/" + STRATEGY_PROBE_FAILURE_LIMIT + ")");
+        if (consecutiveProbeFailures >= STRATEGY_PROBE_FAILURE_LIMIT) {
+            handleStrategyFailure(sampledStrategy, getString(R.string.failover_health_failed, successes));
         }
     }
 
     private void restartAfterFailure(String reason) {
         long now = System.currentTimeMillis();
-        quickRestarts = now - lastEngineStart < QUICK_RESTART_MS ? quickRestarts + 1 : 0;
+        quickRestarts = now - lastEngineStart < QUICK_RESTART_MS ? quickRestarts + 1 : 1;
         if (quickRestarts >= MAX_QUICK_RESTARTS) {
-            stop(reason);
+            if (!ConnectionMode.isSocks5(this) && strategy != null) {
+                handleStrategyFailure(strategy, reason);
+            } else {
+                stop(reason);
+            }
             return;
         }
-        start(strategy != null ? strategy : routeName());
+        start(strategy != null ? strategy : routeName(), false);
     }
 
     @Override
@@ -220,19 +309,34 @@ public class BypassVpnService extends VpnService {
     public void onDestroy() {
         main.removeCallbacksAndMessages(null);
         unregisterNetwork();
+        probeWorker.shutdownNow();
         worker.execute(this::releaseEngines);
         worker.shutdown();
         super.onDestroy();
     }
 
-    private void start(String name) {
+    private void start(String name, boolean manualStart) {
+        main.removeCallbacks(healthTick);
+        if (failoverFrom == null) {
+            AppState.setRouteNotice(null);
+        }
+        consecutiveProbeFailures = 0;
+        nextStrategyProbeAt = System.currentTimeMillis() + STRATEGY_PROBE_INITIAL_DELAY_MS;
+        if (manualStart && !ConnectionMode.isSocks5(this)) {
+            Data.clearFailure(this, NetKind.current(this), name);
+            failoverAttempts = 0;
+            quickRestarts = 0;
+        }
+        boolean strategyStartAttempted = false;
+        boolean strategyEngineReady = false;
+        boolean proxyMode = ConnectionMode.isSocks5(this);
         AppState.set(AppState.Phase.STARTING, name, null);
         try {
             registerNetwork();
             ConnectivityManager manager = getSystemService(ConnectivityManager.class);
             Network active = NetKind.physical(this);
             String kind = NetKind.current(this);
-            boolean proxyMode = ConnectionMode.isSocks5(this);
+            proxyMode = ConnectionMode.isSocks5(this);
             Socks5Settings.Endpoint endpoint = proxyMode ? Socks5Settings.load(this) : null;
 
             if (proxyMode) {
@@ -246,7 +350,9 @@ public class BypassVpnService extends VpnService {
                 Data.extract(this);
                 Data.applyLists(this);
                 startDns(manager, active);
+                strategyStartAttempted = true;
                 startCiadpi(name, kind);
+                strategyEngineReady = true;
                 lastEngineStart = System.currentTimeMillis();
                 enginePort = ciadpiPort;
             }
@@ -278,15 +384,91 @@ public class BypassVpnService extends VpnService {
             setUnderlyingNetworks(active == null ? null : new Network[]{active});
             network = active;
             strategy = name;
+            getSystemService(NotificationManager.class).cancel(FAILURE_NOTIFICATION_ID);
             BackgroundChecks.refreshNotification(this);
             showNotification(name);
             main.removeCallbacks(healthTick);
             main.postDelayed(healthTick, HEALTH_INTERVAL_MS);
             AppState.set(AppState.Phase.ON, name, null);
+            if (failoverFrom != null) {
+                String previous = failoverFrom;
+                String why = failoverReason;
+                failoverFrom = null;
+                failoverReason = null;
+                showFailoverNotification(previous, name, why);
+            }
         } catch (Exception e) {
             Log.e(TAG, "start failed", e);
-            stop(e.getMessage());
+            if (!proxyMode && strategyStartAttempted && !strategyEngineReady) {
+                handleStrategyFailure(name, getString(R.string.failover_start_error, name,
+                        String.valueOf(e.getMessage())));
+            } else {
+                stop(e.getMessage());
+            }
         }
+    }
+
+    /** Try known-good and favourite strategies first; cooldown prevents an endless fallback loop. */
+    private String nextStrategy(String kind, String current) {
+        List<String> names;
+        try {
+            names = Data.strategies(this);
+        } catch (IOException e) {
+            Log.e(TAG, "cannot list strategies for failover", e);
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        List<String> ordered = new ArrayList<>();
+        String lastWorking = Data.lastWorking(this, kind);
+        if (lastWorking != null) {
+            ordered.add(lastWorking);
+        }
+        List<String> favorites = new ArrayList<>(Data.favorites(this));
+        Collections.sort(favorites, Data::compareNatural);
+        ordered.addAll(favorites);
+        ordered.add(Data.recommended(kind));
+        ordered.addAll(names);
+        for (String name : ordered) {
+            if (!name.equals(current) && names.contains(name) && !Data.recentlyFailed(this, kind, name, now)) {
+                return name;
+            }
+        }
+        return null;
+    }
+
+    private void handleStrategyFailure(String failed, String reason) {
+        String kind = NetKind.current(this);
+        Data.markFailed(this, kind, failed);
+        consecutiveProbeFailures = 0;
+        quickRestarts = 0;
+        boolean autoFailover = Data.autoFailoverEnabled(this);
+        String candidate = autoFailover && failoverAttempts < MAX_AUTOMATIC_SWITCHES
+                ? nextStrategy(kind, failed) : null;
+        if (candidate != null) {
+            failoverAttempts++;
+            Log.w(TAG, "strategy failed: " + failed + "; switching to " + candidate + ": " + reason);
+            main.removeCallbacks(healthTick);
+            releaseEngines();
+            strategy = null;
+            network = null;
+            failoverFrom = failed;
+            failoverReason = reason;
+            Data.setFailoverStrategyFor(this, kind, candidate);
+            String notice = getString(R.string.failover_switched, failed, candidate);
+            AppState.setRouteNotice(notice);
+            AppState.set(AppState.Phase.STARTING, candidate, notice);
+            showNotification(candidate);
+            runOnWorker(() -> start(candidate, false));
+            return;
+        }
+
+        boolean direct = Data.failureAction(this).equals(Data.FAILURE_ACTION_DIRECT);
+        String terminal = direct
+                ? getString(R.string.failover_direct_message, failed, reason)
+                : getString(R.string.failover_stop_message, failed, reason);
+        Log.e(TAG, "strategy failover exhausted: " + terminal);
+        showFailureNotification(terminal);
+        stop(terminal);
     }
 
     private String tunnelFingerprint(boolean proxyMode, Socks5Settings.Endpoint endpoint) {
@@ -376,6 +558,12 @@ public class BypassVpnService extends VpnService {
         releaseEngines();
         strategy = null;
         network = null;
+        failoverFrom = null;
+        failoverReason = null;
+        failoverAttempts = 0;
+        consecutiveProbeFailures = 0;
+        quickRestarts = 0;
+        AppState.setRouteNotice(null);
         AppState.set(AppState.Phase.OFF, null, error);
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
@@ -565,6 +753,40 @@ public class BypassVpnService extends VpnService {
         try (FileOutputStream out = new FileOutputStream(tunnelConfig())) {
             out.write(config.getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    private void showFailoverNotification(String previous, String current, String reason) {
+        String text = getString(R.string.failover_switched, previous, current);
+        if (reason != null && !reason.isEmpty()) {
+            text += " · " + reason;
+        }
+        notifyFailure(text);
+    }
+
+    private void showFailureNotification(String message) {
+        notifyFailure(message);
+    }
+
+    private void notifyFailure(String message) {
+        Notification.Builder builder;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            StatusChannels.ensure(this, StatusChannels.BYPASS, R.string.channel_name);
+            builder = new Notification.Builder(this, StatusChannels.BYPASS);
+        } else {
+            builder = new Notification.Builder(this);
+        }
+        PendingIntent open = PendingIntent.getActivity(this, FAILURE_NOTIFICATION_ID,
+                new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification notification = builder
+                .setSmallIcon(R.drawable.ic_shield)
+                .setContentTitle(getString(R.string.failover_notice_title))
+                .setContentText(message)
+                .setStyle(new Notification.BigTextStyle().bigText(message))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .build();
+        getSystemService(NotificationManager.class).notify(FAILURE_NOTIFICATION_ID, notification);
     }
 
     private void showNotification(String name) {

@@ -35,13 +35,17 @@ import org.zapretcap.tgproxy.TgWsProxy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Главный экран: включить, выключить и выбрать конфиг отдельно для Wi-Fi и мобильной сети. */
 public class MainActivity extends Activity implements AppState.Listener {
+    private static final AtomicBoolean QUICK_TEST_RUNNING = new AtomicBoolean();
     private static final int REQUEST_VPN = 1;
     private static final int REQUEST_SOCKS_SETTINGS = 5;
 
     private final List<String> names = new ArrayList<>();
+    private final List<String> visibleNames = new ArrayList<>();
+    private boolean favoritesOnly;
     private boolean selectSocksAfterSettings;
     private boolean startAfterSocksSettings;
 
@@ -64,6 +68,9 @@ public class MainActivity extends Activity implements AppState.Listener {
     private TextView statusDetail;
     private TextView tabWifi;
     private TextView tabCell;
+    private TextView filterAll;
+    private TextView filterFavorites;
+    private TextView emptyFavorites;
     private TextView modeZapret;
     private TextView modeSocks;
     private TextView modeDescription;
@@ -79,7 +86,12 @@ public class MainActivity extends Activity implements AppState.Listener {
     private TextView tgStrategy;
     private Switch tgSwitch;
     private View testButton;
+    private View quickTestButton;
+    private View diagnosticsButton;
     private AlertDialog testDialog;
+    private AlertDialog quickDialog;
+    private QuickTester quickTester;
+    private boolean activityStarted;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable testTick = this::updateTest;
     private final Runnable statsTick = new Runnable() {
@@ -136,22 +148,35 @@ public class MainActivity extends Activity implements AppState.Listener {
         tabCell = header.findViewById(R.id.tab_cell);
         tabWifi.setOnClickListener(v -> showKind(NetKind.WIFI));
         tabCell.setOnClickListener(v -> showKind(NetKind.CELL));
+        filterAll = header.findViewById(R.id.filter_all);
+        filterFavorites = header.findViewById(R.id.filter_favorites);
+        emptyFavorites = header.findViewById(R.id.config_empty_favorites);
+        filterAll.setOnClickListener(v -> setFavoritesFilter(false));
+        filterFavorites.setOnClickListener(v -> setFavoritesFilter(true));
 
         adapter = new ConfigAdapter();
         list.setAdapter(adapter);
         list.setOnItemClickListener((parent, view, position, id) -> {
             int index = position - list.getHeaderViewsCount();
-            if (index >= 0 && index < names.size()) {
-                onStrategyPicked(names.get(index));
+            if (index >= 0 && index < visibleNames.size()) {
+                onStrategyPicked(visibleNames.get(index));
             }
         });
 
         toggle.setOnClickListener(v -> onToggle());
         testButton = header.findViewById(R.id.test_configs);
         testButton.setOnClickListener(v -> {
+            if (QUICK_TEST_RUNNING.get()) {
+                Toast.makeText(this, R.string.quick_test_running, Toast.LENGTH_SHORT).show();
+                return;
+            }
             ConfigTester.start(this);
             updateTest();
         });
+        quickTestButton = header.findViewById(R.id.quick_test);
+        quickTestButton.setOnClickListener(v -> runQuickTest());
+        diagnosticsButton = header.findViewById(R.id.diagnostics);
+        diagnosticsButton.setOnClickListener(v -> showDiagnostics());
         header.findViewById(R.id.open_domains).setOnClickListener(
                 v -> startActivity(new Intent(this, DomainListActivity.class)));
 
@@ -181,6 +206,7 @@ public class MainActivity extends Activity implements AppState.Listener {
     @Override
     protected void onStart() {
         super.onStart();
+        activityStarted = true;
         AppState.setListener(this);
         // The app mode and endpoint can change while the settings screen is open.
         updateModeUi();
@@ -215,6 +241,13 @@ public class MainActivity extends Activity implements AppState.Listener {
         onStateChanged();
         statsTick.run();
         updateTest();
+        if (quickTester != null && QUICK_TEST_RUNNING.get() && quickDialog == null) {
+            quickDialog = new AlertDialog.Builder(this)
+                    .setTitle(R.string.quick_test_title)
+                    .setMessage(R.string.quick_test_cancelling)
+                    .setCancelable(false)
+                    .show();
+        }
         // служба могла быть остановлена системой, пока приложения не было на экране
         if (TgProxySettings.prefs(this).getBoolean(TgProxySettings.ENABLED, false)) {
             if (AppState.tgPhase == AppState.Phase.OFF) {
@@ -226,9 +259,14 @@ public class MainActivity extends Activity implements AppState.Listener {
 
     @Override
     protected void onStop() {
+        activityStarted = false;
         handler.removeCallbacks(statsTick);
         handler.removeCallbacks(testTick);
         closeTestDialog();
+        if (quickTester != null) {
+            quickTester.cancel();
+        }
+        dismissQuickDialog();
         AppState.setListener(null);
         super.onStop();
     }
@@ -294,11 +332,54 @@ public class MainActivity extends Activity implements AppState.Listener {
     private void sortConfigs() {
         String chosen = selected();
         String recommended = Data.recommended(editingKind);
+        java.util.Set<String> favorites = Data.favorites(this);
         java.util.Collections.sort(names, (a, b) -> {
-            int rankA = a.equals(chosen) ? 0 : a.equals(recommended) ? 1 : 2;
-            int rankB = b.equals(chosen) ? 0 : b.equals(recommended) ? 1 : 2;
+            int rankA = a.equals(chosen) ? 0 : favorites.contains(a) ? 1 : a.equals(recommended) ? 2 : 3;
+            int rankB = b.equals(chosen) ? 0 : favorites.contains(b) ? 1 : b.equals(recommended) ? 2 : 3;
             return rankA != rankB ? rankA - rankB : Data.compareNatural(a, b);
         });
+        refreshVisibleNames();
+    }
+
+    private void refreshVisibleNames() {
+        visibleNames.clear();
+        java.util.Set<String> favorites = Data.favorites(this);
+        int favoriteCount = 0;
+        for (String name : names) {
+            boolean favorite = favorites.contains(name);
+            if (favorite) {
+                favoriteCount++;
+            }
+            if (!favoritesOnly || favorite) {
+                visibleNames.add(name);
+            }
+        }
+        if (filterAll != null) {
+            updateFilterUi(favoriteCount);
+        }
+    }
+
+    private void setFavoritesFilter(boolean favorites) {
+        favoritesOnly = favorites;
+        refreshVisibleNames();
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+    }
+
+    private void updateFilterUi(int favoriteCount) {
+        filterAll.setSelected(!favoritesOnly);
+        filterFavorites.setSelected(favoritesOnly);
+        filterFavorites.setText(getString(R.string.config_filter_favorites_count, favoriteCount));
+        emptyFavorites.setVisibility(favoritesOnly && visibleNames.isEmpty() ? View.VISIBLE : View.GONE);
+    }
+
+    private void toggleFavorite(String name) {
+        boolean added = Data.toggleFavorite(this, name);
+        Toast.makeText(this, added ? R.string.config_favorite_added : R.string.config_favorite_removed,
+                Toast.LENGTH_SHORT).show();
+        sortConfigs();
+        adapter.notifyDataSetChanged();
     }
 
     private void loadStrategies() {
@@ -323,12 +404,14 @@ public class MainActivity extends Activity implements AppState.Listener {
         boolean on = phase == AppState.Phase.ON;
         if (on) {
             status.setText(R.string.status_on_short);
-            statusDetail.setText(getString(R.string.status_detail_on, AppState.strategy, getString(
-                    NetKind.CELL.equals(NetKind.current(this)) ? R.string.net_cell : R.string.net_wifi)));
+            String detail = getString(R.string.status_detail_on, AppState.strategy, getString(
+                    NetKind.CELL.equals(NetKind.current(this)) ? R.string.net_cell : R.string.net_wifi));
+            statusDetail.setText(AppState.routeNotice == null ? detail : detail + "\n" + AppState.routeNotice);
             toggle.setText(R.string.turn_off);
         } else if (phase == AppState.Phase.STARTING) {
             status.setText(R.string.status_starting);
-            statusDetail.setText(AppState.strategy);
+            String detail = AppState.strategy;
+            statusDetail.setText(AppState.routeNotice == null ? detail : detail + "\n" + AppState.routeNotice);
             toggle.setText(R.string.turn_off);
         } else {
             status.setText(R.string.status_off_short);
@@ -383,12 +466,13 @@ public class MainActivity extends Activity implements AppState.Listener {
         AppState.Phase phase = AppState.tgPhase;
         TgWsProxy proxy = AppState.tgProxy;
         tgSwitch.setChecked(phase != AppState.Phase.OFF);
-        if (phase == AppState.Phase.ON && proxy != null && proxy.stats().recentBadKey()) {
-            tgStatus.setText(R.string.tg_status_bad_key);
-        } else if (phase == AppState.Phase.ON && proxy != null) {
+        if (phase == AppState.Phase.ON && proxy != null) {
             Stats stats = proxy.stats();
-            tgStatus.setText(getString(R.string.tg_status_on, (int) stats.active(),
-                    Stats.humanBytes(stats.bytesDown()), Stats.humanBytes(stats.bytesUp())));
+            String text = proxy.stats().recentBadKey() ? getString(R.string.tg_status_bad_key)
+                    : getString(R.string.tg_status_on, (int) stats.active(),
+                            Stats.humanBytes(stats.bytesDown()), Stats.humanBytes(stats.bytesUp()));
+            String engineNotice = TgEngine.notice();
+            tgStatus.setText(engineNotice == null ? text : text + "\n" + engineNotice);
         } else if (phase == AppState.Phase.STARTING) {
             tgStatus.setText(R.string.tg_status_starting);
         } else {
@@ -520,6 +604,179 @@ public class MainActivity extends Activity implements AppState.Listener {
         });
     }
 
+    private void runQuickTest() {
+        if (ConnectionMode.isSocks5(this)) {
+            return;
+        }
+        if (ConfigTester.pending() != null) {
+            Toast.makeText(this, R.string.full_test_running, Toast.LENGTH_SHORT).show();
+            updateTest();
+            return;
+        }
+        String kind = NetKind.current(this);
+        String strategy = Data.strategyFor(this, kind);
+        int activePort = BypassVpnService.enginePort;
+        QuickTester tester = new QuickTester(this);
+        if (!QUICK_TEST_RUNNING.compareAndSet(false, true)) {
+            Toast.makeText(this, R.string.quick_test_running, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        quickTester = tester;
+        quickTestButton.setEnabled(false);
+        testButton.setEnabled(false);
+        quickDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.quick_test_title)
+                .setMessage(R.string.quick_test_starting)
+                .setCancelable(false)
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+        quickDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
+            tester.cancel();
+            quickDialog.setMessage(R.string.quick_test_cancelling);
+            quickDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(false);
+        });
+        Thread thread = new Thread(() -> {
+            try {
+                QuickTester.Result result = tester.run(kind, strategy, activePort,
+                        message -> handler.post(() -> {
+                            if (quickTester == tester && quickDialog != null && quickDialog.isShowing()
+                                    && !tester.isCancelled()) {
+                                quickDialog.setMessage(message);
+                            }
+                        }));
+                handler.post(() -> finishQuickTest(tester, result, null, false));
+            } catch (InterruptedException cancelled) {
+                handler.post(() -> finishQuickTest(tester, null, null, true));
+            } catch (IOException | RuntimeException e) {
+                String message = String.valueOf(e.getMessage());
+                handler.post(() -> finishQuickTest(tester, null, message, false));
+            } finally {
+                QUICK_TEST_RUNNING.set(false);
+            }
+        }, "quick-config-test");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void dismissQuickDialog() {
+        if (quickDialog != null) {
+            quickDialog.dismiss();
+            quickDialog = null;
+        }
+    }
+
+    private void closeQuickDialog() {
+        dismissQuickDialog();
+        quickTester = null;
+        if (quickTestButton != null) {
+            quickTestButton.setEnabled(true);
+        }
+        if (testButton != null) {
+            testButton.setEnabled(true);
+        }
+    }
+
+    private void finishQuickTest(QuickTester tester, QuickTester.Result result, String failure, boolean cancelled) {
+        if (quickTester != tester) {
+            return;
+        }
+        boolean showResult = activityStarted && !isFinishing() && !isDestroyed();
+        closeQuickDialog();
+        if (!showResult || cancelled || tester.isCancelled()) {
+            return;
+        }
+        if (failure != null) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.quick_test_title)
+                    .setMessage(getString(R.string.quick_test_failed, failure))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+        } else if (result != null) {
+            showQuickResult(result);
+        }
+    }
+
+    private void showQuickResult(QuickTester.Result result) {
+        StringBuilder text = new StringBuilder(getString(R.string.quick_test_result_summary,
+                result.strategy, result.strategyCount(), result.targets.size(),
+                result.directCount(), result.targets.size()));
+        for (int i = 0; i < result.targets.size(); i++) {
+            text.append("\n\n").append(getString(R.string.quick_test_result_row,
+                    result.targets.get(i),
+                    getString(Boolean.TRUE.equals(result.viaStrategy.get(i))
+                            ? R.string.quick_test_open : R.string.quick_test_failed_sample),
+                    getString(Boolean.TRUE.equals(result.direct.get(i))
+                            ? R.string.quick_test_open : R.string.quick_test_failed_sample)));
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.quick_test_title)
+                .setMessage(text)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+    }
+
+    private void showDiagnostics() {
+        String kind = NetKind.current(this);
+        String strategy = Data.strategyFor(this, kind);
+        String lastWorking = Data.lastWorking(this, kind);
+        String mode = ConnectionMode.isSocks5(this) ? getString(R.string.mode_socks5) : getString(R.string.mode_zapret);
+        StringBuilder report = new StringBuilder();
+        report.append(getString(R.string.diagnostics_app)).append(Build.VERSION.SDK_INT)
+                .append("\n").append(getString(R.string.diagnostics_network, getString(
+                        NetKind.CELL.equals(kind) ? R.string.net_cell : R.string.net_wifi)))
+                .append("\n").append(getString(R.string.diagnostics_mode, mode))
+                .append("\n").append(getString(R.string.diagnostics_strategy, strategy))
+                .append("\n").append(getString(R.string.diagnostics_last_working,
+                        lastWorking == null ? getString(R.string.diagnostics_none) : lastWorking))
+                .append("\n").append(getString(R.string.diagnostics_failover,
+                        Data.autoFailoverEnabled(this) ? getString(R.string.diagnostics_enabled)
+                                : getString(R.string.diagnostics_disabled),
+                        Data.failureAction(this).equals(Data.FAILURE_ACTION_DIRECT)
+                                ? getString(R.string.failure_action_direct)
+                                : getString(R.string.failure_action_stop)))
+                .append("\n").append(getString(R.string.diagnostics_route,
+                        AppState.phase.name(), AppState.strategy == null ? "—" : AppState.strategy,
+                        BypassVpnService.enginePort > 0 ? getString(R.string.diagnostics_engine_running)
+                                : getString(R.string.diagnostics_engine_stopped)))
+                .append("\n").append(getString(R.string.diagnostics_favorites, Data.favorites(this).size()));
+        if (AppState.routeNotice != null && !AppState.routeNotice.isEmpty()) {
+            report.append("\n").append(getString(R.string.diagnostics_route_notice, AppState.routeNotice));
+        }
+        if (AppState.error != null && !AppState.error.isEmpty()) {
+            report.append("\n\n").append(getString(R.string.diagnostics_last_error, AppState.error));
+        }
+        String tgEngineNotice = TgEngine.notice();
+        if (tgEngineNotice != null) {
+            report.append("\n").append(getString(R.string.diagnostics_tg_engine, tgEngineNotice));
+        }
+        String crash = CrashLog.read(this);
+        if (crash != null && !crash.trim().isEmpty()) {
+            String[] lines = crash.trim().split("\\r?\\n");
+            report.append("\n\n").append(getString(R.string.diagnostics_crash));
+            for (int i = Math.max(0, lines.length - 8); i < lines.length; i++) {
+                report.append("\n").append(lines[i]);
+            }
+        }
+        List<String> logs = org.zapretcap.tgproxy.ProxyLog.recent();
+        if (!logs.isEmpty()) {
+            report.append("\n\n").append(getString(R.string.diagnostics_tg_log));
+            for (int i = Math.max(0, logs.size() - 8); i < logs.size(); i++) {
+                report.append("\n").append(logs.get(i));
+            }
+        }
+        String diagnostic = report.toString();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.diagnostics_title)
+                .setMessage(diagnostic)
+                .setPositiveButton(R.string.diagnostics_copy, (dialog, which) -> {
+                    ClipboardManager clipboard = getSystemService(ClipboardManager.class);
+                    clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.diagnostics_title), diagnostic));
+                    Toast.makeText(this, R.string.diagnostics_copied, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(android.R.string.ok, null)
+                .show();
+    }
+
     private void selectStrategy(String name) {
         onStrategyPicked(name);
     }
@@ -638,6 +895,7 @@ public class MainActivity extends Activity implements AppState.Listener {
 
     private void onStrategyPicked(String name) {
         Data.setStrategyFor(this, editingKind, name);
+        sortConfigs();
         adapter.notifyDataSetChanged();
         // конфиг применяется сразу: смена при перебоях должна быть в одно касание. Выбор для другой сети подождёт её
         if (AppState.phase != AppState.Phase.OFF && editingKind.equals(NetKind.current(this))) {
@@ -700,12 +958,12 @@ public class MainActivity extends Activity implements AppState.Listener {
     private final class ConfigAdapter extends android.widget.BaseAdapter {
         @Override
         public int getCount() {
-            return ConnectionMode.isSocks5(MainActivity.this) ? 0 : names.size();
+            return ConnectionMode.isSocks5(MainActivity.this) ? 0 : visibleNames.size();
         }
 
         @Override
         public String getItem(int position) {
-            return names.get(position);
+            return visibleNames.get(position);
         }
 
         @Override
@@ -722,6 +980,13 @@ public class MainActivity extends Activity implements AppState.Listener {
             ((TextView) row.findViewById(R.id.config_name)).setText(name);
             row.findViewById(R.id.config_check).setVisibility(chosen ? View.VISIBLE : View.INVISIBLE);
             row.setBackgroundResource(chosen ? R.drawable.bg_row_selected : R.drawable.bg_row);
+            TextView favorite = row.findViewById(R.id.config_favorite);
+            boolean isFavorite = Data.isFavorite(MainActivity.this, name);
+            favorite.setText(isFavorite ? "★" : "☆");
+            favorite.setTextColor(getColor(isFavorite ? R.color.aris_mint : R.color.muted));
+            favorite.setContentDescription(getString(isFavorite
+                    ? R.string.config_favorite_remove : R.string.config_favorite_add, name));
+            favorite.setOnClickListener(v -> toggleFavorite(name));
             TextView detail = row.findViewById(R.id.config_detail);
             String score = Data.scoped(prefs, editingScopes, scope -> Data.scoreKey(scope, name));
             boolean recommended = name.equals(Data.recommended(editingKind));

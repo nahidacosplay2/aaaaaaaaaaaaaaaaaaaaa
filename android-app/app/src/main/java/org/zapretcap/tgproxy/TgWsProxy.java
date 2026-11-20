@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -95,21 +96,25 @@ public final class TgWsProxy {
             return;
         }
         ProxyLog.i("Сеть сменилась, соединения открываются заново");
-        executor.execute(() -> {
-            wsPool.flush();
-            workerPool.flush();
-            bridge.resetBackoff();
-            Socket[] active;
-            synchronized (clients) {
-                active = clients.toArray(new Socket[0]);
-            }
-            for (Socket client : active) {
-                Dialer.closeQuietly(client);
-            }
-            if (h2Pool != null) {
-                h2Pool.resetLanes();
-            }
-        });
+        try {
+            executor.execute(() -> {
+                wsPool.flush();
+                workerPool.flush();
+                bridge.resetBackoff();
+                Socket[] active;
+                synchronized (clients) {
+                    active = clients.toArray(new Socket[0]);
+                }
+                for (Socket client : active) {
+                    Dialer.closeQuietly(client);
+                }
+                if (h2Pool != null) {
+                    h2Pool.resetLanes();
+                }
+            });
+        } catch (RejectedExecutionException stopped) {
+            // Сообщение о смене сети пришло одновременно с выключением прокси.
+        }
     }
 
     /** Занимает порт и возвращает управление, ошибка привязки сразу видна вызывающему. */

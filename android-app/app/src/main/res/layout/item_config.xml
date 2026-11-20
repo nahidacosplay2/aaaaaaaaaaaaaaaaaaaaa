@@ -8,7 +8,7 @@
     android:orientation="horizontal"
     android:paddingStart="14dp"
     android:paddingTop="8dp"
-    android:paddingEnd="14dp"
+    android:paddingEnd="8dp"
     android:paddingBottom="8dp">
 
     <LinearLayout
@@ -31,11 +31,23 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/config_favorite"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="☆"
+        android:textColor="@color/muted"
+        android:textSize="23sp" />
+
     <ImageView
         android:id="@+id/config_check"
         android:layout_width="22dp"
         android:layout_height="22dp"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="6dp"
         android:contentDescription="@string/config_selected"
         android:src="@drawable/ic_check" />
 </LinearLayout>

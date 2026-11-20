@@ -423,7 +423,7 @@ final class ConfigTester {
     }
 
     /** Отдельный ciadpi на свободном порту. Null, если движок не принял аргументы. */
-    private static final class Engine {
+    static final class Engine {
         final Process process;
         final int port;
 
@@ -506,7 +506,7 @@ final class ConfigTester {
     }
 
     /** Открывается ли сайт: TLS с проверкой сертификата, ответ HTTP и данные, которые не застывают на середине. */
-    private static boolean opens(String target, InetAddress address, int socksPort) {
+    static boolean opens(String target, InetAddress address, int socksPort) {
         String host = hostOf(target);
         String path = target.substring(host.length());
         if (path.isEmpty()) {

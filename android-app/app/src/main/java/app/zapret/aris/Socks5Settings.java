@@ -151,7 +151,7 @@ final class Socks5Settings {
         return "'" + value.replace("'", "''") + "'";
     }
 
-    private static String normalizeHost(String raw) {
+    static String normalizeHost(String raw) {
         if (raw == null) {
             return null;
         }
