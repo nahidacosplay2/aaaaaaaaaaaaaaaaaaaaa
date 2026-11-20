@@ -50,7 +50,11 @@ jobs:
               tail -n 80 "$log"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-            detail="$(tail -n 45 "$log" | tr '\n' ' ' | sed -e 's/%/%25/g' -e 's/;/\%3B/g' -e 's/\r/%0D/g' | cut -c1-4000)"
+            detail="$(grep -n -B 2 -A 12 -E '(What went wrong:|^> Task .*FAILED|error:|Execution failed for task|FAILURE: Build failed)' "$log" | tail -n 45 || true)"
+            if [ -z "$detail" ]; then
+              detail="$(tail -n 45 "$log")"
+            fi
+            detail="$(printf '%s' "$detail" | tr '\n' ' ' | sed -e 's/%/%25/g' -e 's/;/\%3B/g' -e 's/\r/%0D/g' | cut -c1-4000)"
             echo "::error title=Gradle assemble details::$detail"
           fi
           exit "$status"
