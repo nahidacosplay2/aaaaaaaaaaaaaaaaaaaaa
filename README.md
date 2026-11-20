@@ -1,26 +1,30 @@
-# Zapret Aris — mobile interface prototype
+# Zapret Aris — Android project and mobile UI preview
 
-Тёмный мобильный редизайн панели сетевых профилей в палитре Arisu: холодный синий, циановые сигналы, компактная навигация и отдельный выбор профиля и транспорта.
+В репозитории находятся исходники Android-приложения Zapret Aris и отдельный браузерный прототип его интерфейса. **Опубликованного APK пока нет.** Чужие/референсные APK и ZIP удалены: они не являются сборкой Aris и не нужны для сборки исходников.
 
-## Скачать исходный APK на телефон
+## Что есть в проекте
 
-APK уже доступен в корне GitHub-репозитория: [скачать ZapretAndroid v1.10.4-r3](https://raw.githubusercontent.com/nahidacosplay2/aaaaaaaaaaaaaaaaaaaaa/main/ZapretAndroid-v1.10.4-r3.apk). Это исходный загруженный APK, **не сборка Zapret Aris**. SHA-256: `ceb4e304fd73cb84bacdeeb3c4f8a0427e6c265c9d53618ba19f65282231ee64`.
+- `android-app/` — Java/XML Android-приложение. В исходниках предусмотрены два VPN-маршрута: локальный Zapret через ByeDPI/HEV и upstream SOCKS5 через HEV; прокси Telegram — отдельная служба.
+- `index.html`, `styles.css`, `app.js` — автономный интерактивный UI-прототип. Он сохраняет демонстрационные параметры только в `localStorage` браузера и **не запускает Android VPN, Xray, SOCKS5 или WebSocket-соединение**.
+- `assets/arisu-reference.png`, `assets/arisu-mark.svg` — графика прототипа.
+- `docs/ZAPRET-ARIS-ROADMAP.md` — текущий статус, ограничения и план проверки.
 
-## Запуск UI-превью
+Обход зависит от оператора и сети. В SOCKS5-режиме нужен доступный SOCKS5-сервер; VLESS/VMess-ссылки сами по себе не поддерживаются. TCP-проба не подтверждает работу UDP, DNS или системного VPN-туннеля. См. [Android README](android-app/README.md).
+
+## Открыть UI-прототип
 
 ```bash
 python3 -m http.server 4173 --bind 0.0.0.0
 ```
 
-Откройте `http://localhost:4173` локально или используйте live preview. Работает без сборки и внешних библиотек.
+Затем откройте `http://localhost:4173` в браузере на той же машине. Для Arena live preview используется порт, который предоставит среда.
 
-## Что находится в репозитории
+## Собрать Android-приложение
 
-- `ZapretAndroid-v1.10.4-r3.apk` — Android-пакет.
-- `ZapretAndroid-v1.10.4-r3.zip` — содержимое APK (manifest, DEX, нативные библиотеки и assets), а не исходный Android/Gradle-проект.
-- `index.html`, `styles.css`, `app.js` — интерактивный мобильный UI-прототип.
-- `assets/arisu-reference.png` — приложенный арт, использованный в оформлении.
-- `downloads/README.md` и `SHA256SUMS.txt` — страница загрузки и контрольные суммы.
-- `docs/ZAPRET-ARIS-ROADMAP.md` — сравнение текущих файлов и план интеграции Xray/диагностики.
+Требуются JDK 17, Android SDK 35 и NDK `28.2.13676358`. См. инструкции в [android-app/README.md](android-app/README.md). Из каталога `android-app/`:
 
-Исходные APK и ZIP оставлены без изменений. Прототип позволяет выбирать профили (Авто, Flowseal General, QUIC/UDP, Custom), транспорт (Android VPN/TUN, SOCKS5, WebSocket), DNS и приложения; SOCKS5 можно направить на уже запущенный локальный вход Xray, но само ядро здесь не запускается. Конфигурация хранится только в браузере. Нативная VPN-служба и проверка реального трафика в этот интерфейс не подключены — для пересборки самого APK нужен исходный Android-проект.
+```bash
+./gradlew assembleRelease
+```
+
+Workflow [.github/workflows/android-apk.yml](.github/workflows/android-apk.yml) собирает release-вариант для проверки в CI и прикладывает APK с SHA-256 к запуску GitHub Actions на 14 дней. Без release-keystore он подписан временным CI debug-ключом: это тестовая сборка, не стабильный релиз, не для Google Play и не для обновления между разными запусками CI. Сборка сама по себе также не заменяет проверку на реальном устройстве. Не устанавливайте APK из постороннего источника, выдавая его за Aris; готовый релиз появится только после device-тестов и подписи постоянным ключом.

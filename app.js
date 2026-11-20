@@ -40,16 +40,32 @@
     const freshDefaults = () => JSON.parse(JSON.stringify(defaults));
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (!saved || typeof saved !== 'object') return freshDefaults();
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return freshDefaults();
+      const savedApps = saved.apps && typeof saved.apps === 'object' && !Array.isArray(saved.apps)
+        ? saved.apps
+        : {};
+      const savedEvents = Array.isArray(saved.events)
+        ? saved.events
+          .filter((event) => event && typeof event === 'object' && !Array.isArray(event))
+          .slice(0, 30)
+          .map((event) => ({
+            time: String(event.time ?? '').slice(0, 32),
+            title: String(event.title ?? '').slice(0, 160),
+            kind: String(event.kind ?? '').slice(0, 48)
+          }))
+        : [];
       const loaded = {
         ...freshDefaults(),
         ...saved,
-        customDns: String(saved.customDns ?? defaults.customDns),
-        socksHost: String(saved.socksHost ?? defaults.socksHost),
-        socksPort: String(saved.socksPort ?? defaults.socksPort),
-        wsEndpoint: String(saved.wsEndpoint ?? defaults.wsEndpoint),
-        apps: { ...defaults.apps, ...(saved.apps && typeof saved.apps === 'object' ? saved.apps : {}) },
-        events: Array.isArray(saved.events) ? saved.events.slice(0, 30) : []
+        customDns: String(saved.customDns ?? defaults.customDns).slice(0, 253),
+        socksHost: String(saved.socksHost ?? defaults.socksHost).slice(0, 253),
+        socksPort: String(saved.socksPort ?? defaults.socksPort).slice(0, 5),
+        wsEndpoint: String(saved.wsEndpoint ?? defaults.wsEndpoint).slice(0, 2048),
+        apps: Object.fromEntries(Object.keys(defaults.apps).map((name) => [
+          name,
+          typeof savedApps[name] === 'boolean' ? savedApps[name] : defaults.apps[name]
+        ])),
+        events: savedEvents
       };
       if (!Object.prototype.hasOwnProperty.call(PROFILE_NAMES, loaded.profile)) loaded.profile = defaults.profile;
       if (!Object.prototype.hasOwnProperty.call(TRANSPORT_NAMES, loaded.transport)) loaded.transport = defaults.transport;
