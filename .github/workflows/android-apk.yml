@@ -50,6 +50,8 @@ jobs:
               tail -n 80 "$log"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+            detail="$(tail -n 45 "$log" | tr '\n' ' ' | sed -e 's/%/%25/g' -e 's/;/\%3B/g' -e 's/\r/%0D/g' | cut -c1-4000)"
+            echo "::error title=Gradle assemble details::$detail"
           fi
           exit "$status"
 
