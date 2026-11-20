@@ -632,7 +632,7 @@ public class MainActivity extends Activity implements AppState.Listener {
                 .show();
         quickDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
             tester.cancel();
-            quickDialog.setMessage(R.string.quick_test_cancelling);
+            quickDialog.setMessage(getString(R.string.quick_test_cancelling));
             quickDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(false);
         });
         Thread thread = new Thread(() -> {

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +84,9 @@ final class SettingsTransfer {
         List<String> strategies = Data.strategies(context);
         Set<String> strategyNames = new LinkedHashSet<>(strategies);
         Map<String, Object> values = new LinkedHashMap<>();
-        for (String key : settings.keySet()) {
+        Iterator<String> keys = settings.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
             // Service state, health cooldowns, old score rows and device-specific prompts are deliberately ignored.
             if (isIgnoredKey(key)) {
                 continue;
